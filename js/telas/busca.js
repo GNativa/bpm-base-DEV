@@ -128,6 +128,7 @@ class TelaDeBusca extends Tela {
     }
 
     renderizarTabela() {
+        this.limparLinhas();
         const descricoes = this.fonte.descricoes;
         const cabecalho = this.container.find("thead tr");
         const corpo = this.container.find("tbody");
@@ -167,7 +168,6 @@ class TelaDeBusca extends Tela {
     }
 
     async pesquisar() {
-        this.limparLinhas();
         this.iniciarPesquisa();
         await this.carregarDados();
         this.finalizarPesquisa();
