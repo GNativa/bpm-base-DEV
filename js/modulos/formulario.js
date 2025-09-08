@@ -3,318 +3,171 @@
         - Mantém o estado do formulário, realizando carregamento e salvamento de dados, validações, etc.
  */
 // TODO: atualizar classe para o novo formato
-const Formulario = (() => {
-    // Variáveis para uso em validações, consultas, etc.
-    let campos = {};                                    // Objeto contendo referências aos campos do formulário
+class Formulario {
+    #fontes = {};
+    #secoes = new Map();
+    #campos;
+    #conversores = [];
+    #validador;
+    #secaoAprovacao = null;
+    #secaoContaBancaria = null;
+    #secaoDadosPrincipais = null;
+    #secaoDetalhesDocumentos = null;
+    #secaoControle = null;
+    #personalizacao;
 
-    let secaoAprovacao,              // Seção de aprovação
-        secaoDadosPrincipais,        // Seção dos dados principais
-        secaoContaBancaria,          // Etc.
-        secaoDetalhesDocumentos,
-        secaoControle;
+    constructor(colecao, validador) {
+        this.#campos = colecao;
+        this.#validador = validador;
 
-    const personalizacao = {
-        titulo: "Formulário",
-    };
+        this.#personalizacao = {
+            titulo: "Formulário",
+        };
 
-    const camposObrigatorios = {                       // Listas dos IDs dos campos obrigatórios por etapa
-        "etapa1": [],
-    };
+        this.#validador.definirCamposObrigatorios({
+            "etapa1": [],
+        });
 
-    const camposBloqueados = {                         // Listas dos IDs dos campos bloqueados por etapa
-        "etapa1": [],
-    };
+        this.#validador.definirCamposBloqueados({
+            "etapa1": [],
+        });
 
-    const camposOcultos = {                            // Listas dos IDs dos campos ocultos por etapa
-        "etapa1": [],
-    };
+        this.#validador.definirCamposOcultos({
+            "etapa1": [],
+        });
 
-    const nomeFonteCnpj = "Consulta de pessoas jurídicas";
+        const nomeFonteCnpj = "Consulta de pessoas jurídicas";
 
-    const fonteCnpj = new Fonte("cnpj", nomeFonteCnpj, null, null,
-        Constantes.fontes.tipos.api, {
-            "cnpj": "CNPJ",
-            "razaoSocial": "Razão social",
-            "nomeFantasia": "Nome fantasia",
-            "cep": "CEP",
-            "estado": "Estado",
-            "cidade": "Cidade",
-            "logradouro": "Logradouro",
-            "numero": "Número",
-            "bairro": "Bairro",
-            "complemento": "Complemento",
-            "emailContato": "E-mail para contato",
-            "telefone": "Telefone",
-            "contatoAdicional": "Contato adicional",
-        },
-        () => {
-            const valor = campos["documento"].val();
-            return valor.length === 14;
-        },
-        null,
-        "https://publica.cnpj.ws/cnpj/",
-        new ParametrosConsulta({
-                method: "GET"
+        const fonteCnpj = new Fonte("cnpj", nomeFonteCnpj, null, null,
+            Constantes.fontes.tipos.api, {
+                "cnpj": "CNPJ",
+                "razaoSocial": "Razão social",
+                "nomeFantasia": "Nome fantasia",
+                "cep": "CEP",
+                "estado": "Estado",
+                "cidade": "Cidade",
+                "logradouro": "Logradouro",
+                "numero": "Número",
+                "bairro": "Bairro",
+                "complemento": "Complemento",
+                "emailContato": "E-mail para contato",
+                "telefone": "Telefone",
+                "contatoAdicional": "Contato adicional",
             },
-            null, null,
-            function () {
-                const valor = campos["documento"].val();
+            () => {
+                const valor = this.#campos.obterCampo("documento").val();
+                return valor.length === 14;
+            },
+            null,
+            "https://publica.cnpj.ws/cnpj/",
+            new ParametrosConsulta({
+                    method: "GET"
+                },
+                null, null,
+                () => {
+                    const campoDocumento = this.#campos.obterCampo("documento");
+                    const valor = campoDocumento.val();
 
-                if (valor === "") {
-                    throw new ExcecaoMensagem(
-                        nomeFonteCnpj,
-                        `O campo "${campos["documento"].rotulo}" não pode estar vazio para consultas.`,
-                        "aviso"
-                    );
+                    if (valor === "") {
+                        throw new ExcecaoMensagem(
+                            nomeFonteCnpj,
+                            `O campo "${campoDocumento.rotulo}" não pode estar vazio para consultas.`,
+                            "aviso"
+                        );
+                    }
+
+                    return valor;
+                }
+            ),
+            function (retorno) {
+                if (!retorno || retorno.length === 0 || !retorno["status"]) {
+                    return;
                 }
 
-                return valor;
-            }
-        ),
-        function (retorno) {
-            if (!retorno || retorno.length === 0 || !retorno["status"]) {
-                return;
-            }
+                let status = retorno["status"];
+                let titulo = nomeFonteCnpj;
+                let mensagem, tipoMensagem;
 
-            let status = retorno["status"];
-            let titulo = nomeFonteCnpj;
-            let mensagem, tipoMensagem;
-
-            switch (status) {
-                case 400: {
-                    mensagem = "CNPJ inválido.";
-                    tipoMensagem = "aviso";
-                    break;
+                switch (status) {
+                    case 400: {
+                        mensagem = "CNPJ inválido.";
+                        tipoMensagem = "aviso";
+                        break;
+                    }
+                    case 404: {
+                        mensagem = "CNPJ não encontrado.";
+                        tipoMensagem = "aviso";
+                        break;
+                    }
+                    case 429: {
+                        //consultarSpeedio();
+                        //return;
+                        mensagem = retorno["detalhes"];
+                        tipoMensagem = "erro";
+                        break;
+                    }
+                    case 500: {
+                        mensagem = retorno["detalhes"];
+                        tipoMensagem = "erro";
+                        break;
+                    }
+                    default: {
+                        mensagem = retorno["detalhes"];
+                        tipoMensagem = "erro";
+                        break;
+                    }
                 }
-                case 404: {
-                    mensagem = "CNPJ não encontrado.";
-                    tipoMensagem = "aviso";
-                    break;
+
+                throw new ExcecaoMensagem(titulo, mensagem, tipoMensagem);
+            },
+            function (dados) {
+                if (!dados || dados.length === 0) {
+                    return [];
                 }
-                case 429: {
-                    //consultarSpeedio();
-                    //return;
-                    mensagem = retorno["detalhes"];
-                    tipoMensagem = "erro";
-                    break;
-                }
-                case 500: {
-                    mensagem = retorno["detalhes"];
-                    tipoMensagem = "erro";
-                    break;
-                }
-                default: {
-                    mensagem = retorno["detalhes"];
-                    tipoMensagem = "erro";
-                    break;
-                }
-            }
 
-            throw new ExcecaoMensagem(titulo, mensagem, tipoMensagem);
-        },
-        function (dados) {
-            if (!dados || dados.length === 0) {
-                return [];
-            }
+                let dadosCnpj = dados[0];
+                let registro = {};
 
-            let dadosCnpj = dados[0];
-            let registro = {};
+                registro["cnpj"] = dadosCnpj["estabelecimento"]["cnpj"];
+                registro["razaoSocial"] = dadosCnpj["razao_social"];
+                registro["nomeFantasia"] = dadosCnpj["estabelecimento"]["nome_fantasia"] ?? "";
+                registro["cep"] = dadosCnpj["estabelecimento"]["cep"];
+                registro["estado"] = dadosCnpj["estabelecimento"]["estado"]["sigla"];
+                registro["cidade"] = dadosCnpj["estabelecimento"]["cidade"]["nome"];
+                const tipoLogradouro = dadosCnpj["estabelecimento"]["tipo_logradouro"] ?? "";
+                registro["logradouro"] = (tipoLogradouro !== "" ? (tipoLogradouro + " ") : "") + dadosCnpj["estabelecimento"]["logradouro"];
+                registro["numero"] = dadosCnpj["estabelecimento"]["numero"];
+                registro["bairro"] = dadosCnpj["estabelecimento"]["bairro"];
+                registro["complemento"] = (dadosCnpj["estabelecimento"]["complemento"] ?? "").replace(/\s\s+/g, " ");
+                registro["emailContato"] = dadosCnpj["estabelecimento"]["email"];
+                const ddd1 = dadosCnpj["estabelecimento"]["ddd1"] ?? "";
+                const telefone1 = dadosCnpj["estabelecimento"]["telefone1"] ?? "";
+                registro["telefone"] = ddd1 + telefone1;
+                const ddd2 = dadosCnpj["estabelecimento"]["ddd2"] ?? "";
+                const telefone2 = dadosCnpj["estabelecimento"]["telefone2"] ?? "";
+                registro["contatoAdicional"] = ddd2 + telefone2;
 
-            registro["cnpj"] = dadosCnpj["estabelecimento"]["cnpj"];
-            registro["razaoSocial"] = dadosCnpj["razao_social"];
-            registro["nomeFantasia"] = dadosCnpj["estabelecimento"]["nome_fantasia"] ?? "";
-            registro["cep"] = dadosCnpj["estabelecimento"]["cep"];
-            registro["estado"] = dadosCnpj["estabelecimento"]["estado"]["sigla"];
-            registro["cidade"] = dadosCnpj["estabelecimento"]["cidade"]["nome"];
-            const tipoLogradouro = dadosCnpj["estabelecimento"]["tipo_logradouro"] ?? "";
-            registro["logradouro"] = (tipoLogradouro !== "" ? (tipoLogradouro + " ") : "") + dadosCnpj["estabelecimento"]["logradouro"];
-            registro["numero"] = dadosCnpj["estabelecimento"]["numero"];
-            registro["bairro"] = dadosCnpj["estabelecimento"]["bairro"];
-            registro["complemento"] = (dadosCnpj["estabelecimento"]["complemento"] ?? "").replace(/\s\s+/g, " ");
-            registro["emailContato"] = dadosCnpj["estabelecimento"]["email"];
-            const ddd1 = dadosCnpj["estabelecimento"]["ddd1"] ?? "";
-            const telefone1 = dadosCnpj["estabelecimento"]["telefone1"] ?? "";
-            registro["telefone"] = ddd1 + telefone1;
-            const ddd2 = dadosCnpj["estabelecimento"]["ddd2"] ?? "";
-            const telefone2 = dadosCnpj["estabelecimento"]["telefone2"] ?? "";
-            registro["contatoAdicional"] = ddd2 + telefone2;
-
-            return [registro];
-        },
-    );
-
-    // Objeto com referências a fontes de dados
-    const fontes = {
-        "cnpjDadosGerais": fonteCnpj,
-        "cnpjContasBancarias": Object.assign({}, fonteCnpj),
-    };
-
-    // obterValidacoes(): array<Validacao>
-    /*
-        Validações a serem usadas no formulário.
-     */
-    function obterValidacoes() {
-        return [];
-    }
-
-    // salvarDados(): Promise<{}>
-    /*
-        Guarda os dados de todos os campos em um objeto para uso na função _saveData da API do workflow.
-     */
-    async function salvarDados() {
-        let dados = {};
-
-        dados.observacoesAprovacao = campos["observacoesAprovacao"].val();
-        dados.documento = campos["documento"].cleanVal(); // Valor do campo sem máscara
-        dados.cadastroComRestricao = campos["cadastroComRestricao"].campo.prop("checked"); // Estado do checkbox (marcado ou não marcado)
-        dados.razaoSocial = campos["razaoSocial"].val();
-        dados.nomeFantasia = campos["nomeFantasia"].val();
-        dados.mercadoExterior = campos["mercadoExterior"].campo.prop("checked");
-        dados.fornecedorIndustria = campos["fornecedorIndustria"].campo.prop("checked");
-        dados.ramoAtividade = campos["ramoAtividade"].val();
-        dados.inscricaoEstadual = campos["inscricaoEstadual"].val();
-        dados.cep = campos["cep"].cleanVal();
-        dados.estado = campos["estado"].val();
-        dados.cidade = campos["cidade"].val();
-        dados.logradouro = campos["logradouro"].val();
-        dados.numero = campos["numero"].val();
-        dados.bairro = campos["bairro"].val();
-        dados.complemento = campos["complemento"].val();
-        dados.enderecoCorresp = campos["enderecoCorresp"].val();
-        dados.nomeContato = campos["nomeContato"].val();
-        dados.emailContato = campos["emailContato"].val();
-        dados.emailAdicional = campos["emailAdicional"].val();
-        dados.telefone = campos["telefone"].cleanVal();
-        dados.celular = campos["celular"].cleanVal();
-        dados.contatoAdicional = campos["contatoAdicional"].cleanVal();
-        dados.formaPagamento = campos["formaPagamento"].val();
-        dados.banco = campos["banco"].val();
-        dados.agenciaDigito = campos["agenciaDigito"].val();
-        dados.contaDigito = campos["contaDigito"].val();
-        dados.tipoConta = campos["tipoConta"].val();
-        dados.documentoConta = campos["documentoConta"].cleanVal();
-        dados.titularComRestricao = campos["titularComRestricao"].campo.prop("checked");
-        dados.titularConta = campos["titularConta"].val();
-        dados.favNomeFantasia = campos["favNomeFantasia"].val();
-        dados.favCep = campos["favCep"].val();
-        dados.favEstado = campos["favEstado"].val();
-        dados.favCidade = campos["favCidade"].val();
-        dados.favLogradouro = campos["favLogradouro"].val();
-        dados.favBairro = campos["favBairro"].val();
-        dados.favNumero = campos["favNumero"].val();
-        dados.favComplemento = campos["favComplemento"].val();
-        dados.favEmail = campos["favEmail"].val();
-        dados.favTelefone = campos["favTelefone"].cleanVal();
-        dados.observacoes = campos["observacoes"].val();
-        dados.documentosPessoaFisica = await Utilitario.salvarArquivosEmString(
-            campos["documentosPessoaFisica"].obterElementoHtml()
-        ); // Salvamento de anexo na forma de uma string
-        dados.comprovanteEndereco = await Utilitario.salvarArquivosEmString(
-            campos["comprovanteEndereco"].obterElementoHtml()
+                return [registro];
+            },
         );
-        dados.comprovanteContaBancaria = await Utilitario.salvarArquivosEmString(
-            campos["comprovanteContaBancaria"].obterElementoHtml()
-        );
-        dados.nomeUsuario = campos["nomeUsuario"].val();
-        dados.retornoRegra = campos["retornoRegra"].val();
 
-        return dados;
-    }
-
-    // carregarDados(mapa: Map): void
-    /*
-        Extrai os dados do mapa obtido como retorno da API do workflow,
-        repassando-os para os campos e variáveis necessárias.
-     */
-    function carregarDados(mapa) {
-        campos["observacoesAprovacao"].val(mapa.get("observacoesAprovacao") || "");
-        campos["documento"].val(mapa.get("documento") || "");
-        const cnpjInaptoCadastro = (mapa.get("cadastroComRestricao") ?? "false") === "true";
-        campos["cadastroComRestricao"].campo.prop("checked", cnpjInaptoCadastro);
-        campos["razaoSocial"].val(mapa.get("razaoSocial") || "");
-        campos["nomeFantasia"].val(mapa.get("nomeFantasia") || "");
-        campos["mercadoExterior"].campo.prop("checked", (mapa.get("mercadoExterior") ?? "false") === "true");
-        campos["fornecedorIndustria"].campo.prop("checked", (mapa.get("fornecedorIndustria") ?? "false") === "true");
-        campos["ramoAtividade"].val(mapa.get("ramoAtividade") || "");
-        campos["inscricaoEstadual"].val(mapa.get("inscricaoEstadual") || "");
-        campos["cep"].val(mapa.get("cep") || "");
-        campos["estado"].val(mapa.get("estado") || "");
-        campos["cidade"].val(mapa.get("cidade") || "");
-        campos["logradouro"].val(mapa.get("logradouro") || "");
-        campos["numero"].val(mapa.get("numero") || "");
-        campos["bairro"].val(mapa.get("bairro") || "");
-        campos["complemento"].val(mapa.get("complemento") || "");
-        campos["enderecoCorresp"].val(mapa.get("enderecoCorresp") || "");
-        campos["nomeContato"].val(mapa.get("nomeContato") || "");
-        campos["emailContato"].val(mapa.get("emailContato") || "");
-        campos["emailAdicional"].val(mapa.get("emailAdicional") || "");
-        campos["telefone"].val(mapa.get("telefone") || "");
-        campos["celular"].val(mapa.get("celular") || "");
-        campos["contatoAdicional"].val(mapa.get("contatoAdicional") || "");
-        campos["formaPagamento"].val(mapa.get("formaPagamento") || "");
-        campos["banco"].val(mapa.get("banco") || "");
-        campos["agenciaDigito"].val(mapa.get("agenciaDigito") || "");
-        campos["contaDigito"].val(mapa.get("contaDigito") || "");
-        campos["tipoConta"].val(mapa.get("tipoConta") || "");
-        campos["documentoConta"].val(mapa.get("documentoConta") || "");
-        const cnpjInaptoTitular = (mapa.get("titularComRestricao") ?? "false") === "true";
-        campos["titularComRestricao"].campo.prop("checked", cnpjInaptoTitular);
-        campos["titularConta"].val(mapa.get("titularConta") || "");
-        campos["favNomeFantasia"].val(mapa.get("favNomeFantasia") || "");
-        campos["favCep"].val(mapa.get("favCep") || "");
-        campos["favEstado"].val(mapa.get("favEstado") || "");
-        campos["favCidade"].val(mapa.get("favCidade") || "");
-        campos["favLogradouro"].val(mapa.get("favLogradouro") || "");
-        campos["favBairro"].val(mapa.get("favBairro") || "");
-        campos["favNumero"].val(mapa.get("favNumero") || "");
-        campos["favComplemento"].val(mapa.get("favComplemento") || "");
-        campos["favEmail"].val(mapa.get("favEmail") || "");
-        campos["favTelefone"].val(mapa.get("favTelefone") || "");
-        campos["observacoes"].val(mapa.get("observacoes") || "");
-        campos["nomeUsuario"].val(mapa.get("nomeUsuario") || "");
-        campos["retornoRegra"].val(mapa.get("retornoRegra") || "");
-        campos["documentosPessoaFisica"].campo.prop(
-            "files",
-            Utilitario.carregarArquivosDeString(mapa.get("documentosPessoaFisica") || "")
-        );
-        campos["comprovanteEndereco"].campo.prop(
-            "files",
-            Utilitario.carregarArquivosDeString(mapa.get("comprovanteEndereco") || "")
-        );
-        campos["comprovanteContaBancaria"].campo.prop(
-            "files",
-            Utilitario.carregarArquivosDeString(mapa.get("comprovanteContaBancaria") || "")
-        );
-    }
-
-    // definirEstadoInicial(): void
-    /*
-        Configura máscaras de campos, consultas de APIs e parâmetros diversos.
-     */
-    function definirEstadoInicial() {
-    }
-
-    // configurarEventos(): void
-    /*
-        Configura eventos em elementos diversos.
-     */
-    function configurarEventos() {
-        // A implementar.
+        this.#fontes["cnpjDadosGerais"] = fonteCnpj;
+        this.#fontes["cnpjContasBancarias"] = Object.assign({}, fonteCnpj);
     }
 
     // gerar(): void
     /*
         Define os campos do formulário, agrupados por seção, e suas propriedades.
      */
-    function gerar() {
+    gerar() {
         const camposAprovacao = [
             new CampoTexto(
                 "observacoesAprovacao", "Observações de aprovação", 12, null, null, null, null, null, null, 5
             ),
         ];
 
-        secaoAprovacao = new Secao("aprovacao", "Aprovação", camposAprovacao);
-        secaoAprovacao.gerar();
+        this.#secaoAprovacao = new Secao("aprovacao", "Aprovação", camposAprovacao, this.#campos);
+        this.#secaoAprovacao.gerar();
 
         const listaEstados = [
             new OpcaoLista("AC", "AC - Acre"),
@@ -357,7 +210,7 @@ const Formulario = (() => {
 
         const camposDadosPrincipais = [
             new CampoTexto(
-                "documento", "CPF/CNPJ", 4, null, fontes["cnpjDadosGerais"], "cnpj",
+                "documento", "CPF/CNPJ", 4, null, this.#fontes["cnpjDadosGerais"], "cnpj",
                 false, false, false
             ),
             new CampoLista("tipoPessoa", "Tipo de pessoa", 2)
@@ -370,12 +223,12 @@ const Formulario = (() => {
                 2, "Marcar caso seja necessário realizar um cadastro com alguma restrição"
             ),
             new CampoTexto(
-                "razaoSocial", "Razão social", 4, null, fontes["cnpjDadosGerais"], "razaoSocial",
+                "razaoSocial", "Razão social", 4, null, this.#fontes["cnpjDadosGerais"], "razaoSocial",
                 true, false,
             ),
             new CampoTexto(
                 "nomeFantasia", "Nome fantasia", 4, "As dicas não são obrigatórias.",
-                fontes["cnpjDadosGerais"], "nomeFantasia", true, true,
+                this.#fontes["cnpjDadosGerais"], "nomeFantasia", true, true,
             ),
             new CampoCheckbox("mercadoExterior", "Mercado exterior", 2),
             new CampoCheckbox("fornecedorIndustria", "É indústria", 2),
@@ -403,10 +256,11 @@ const Formulario = (() => {
             new CampoTexto(
                 "cep", "CEP", 2,
                 "Pressione TAB ou selecione outro campo para efetuar uma consulta com o CEP informado",
-                fontes["cnpjDadosGerais"], "cep", true, false
+                this.#fontes["cnpjDadosGerais"], "cep", true, false
             ),
+            /*
             new CampoLista("pais", "País", 2,
-               null, fontes["pais"], "pais", true,)
+               null, this.#fontes["pais"], "pais", false)
                 .adicionarOpcoes([
                     new OpcaoLista("0132", "0132 - Afeganistão"),
                     new OpcaoLista("0175", "0175 - Albânia"),
@@ -648,28 +502,29 @@ const Formulario = (() => {
                     new OpcaoLista("8907", "8907 - Zâmbia"),
                     new OpcaoLista("8958", "8958 - Zona Canal Panamá"),
                 ]),
+            */
             new CampoLista("estado", "Estado", 2,
-             null, fontes["cnpjDadosGerais"], "estado")
+                null, this.#fontes["cnpjDadosGerais"], "estado")
                 .adicionarOpcoes(listaEstados),
-            new CampoTexto("cidade", "Cidade", 4, null, fontes["cnpjDadosGerais"], "cidade",
+            new CampoTexto("cidade", "Cidade", 4, null, this.#fontes["cnpjDadosGerais"], "cidade",
                 true, false),
-            new CampoTexto("logradouro", "Logradouro", 4, null, fontes["cnpjDadosGerais"],
+            new CampoTexto("logradouro", "Logradouro", 4, null, this.#fontes["cnpjDadosGerais"],
                 "logradouro", true, false),
-            new CampoTexto("numero", "Número", 2, null, fontes["cnpjDadosGerais"],
+            new CampoTexto("numero", "Número", 2, null, this.#fontes["cnpjDadosGerais"],
                 "numero", true, false),
-            new CampoTexto("bairro", "Bairro", 4, null, fontes["cnpjDadosGerais"],
+            new CampoTexto("bairro", "Bairro", 4, null, this.#fontes["cnpjDadosGerais"],
                 "bairro", true, false),
-            new CampoTexto("complemento", "Complemento", 4, null, fontes["cnpjDadosGerais"],
+            new CampoTexto("complemento", "Complemento", 4, null, this.#fontes["cnpjDadosGerais"],
                 "complemento", true, false),
             new CampoTexto("enderecoCorresp", "Endereço de correspondência", 4),
             new CampoTexto("nomeContato", "Nome do contato", 4),
-            new CampoTexto("emailContato", "E-mail para contato", 4, null, fontes["cnpjDadosGerais"],
+            new CampoTexto("emailContato", "E-mail para contato", 4, null, this.#fontes["cnpjDadosGerais"],
                 "emailContato", true, false, null, null, true),
             new CampoTexto("emailAdicional", "E-mail adicional", 4, null, null,
                 null, null, null, null, null, true),
-            new CampoTexto("telefone", "Telefone", 2, null, fontes["cnpjDadosGerais"],
+            new CampoTexto("telefone", "Telefone", 2, null, this.#fontes["cnpjDadosGerais"],
                 "telefone", true, false),
-            new CampoTexto("celular", "Celular", 2, null, fontes["cnpjDadosGerais"],
+            new CampoTexto("celular", "Celular", 2, null, this.#fontes["cnpjDadosGerais"],
                 "celular", true, false),
             new CampoTexto("contatoAdicional", "Telefone ou celular adicional", 2),
             new CampoLista("formaPagamento", "Forma de pagamento", 2)
@@ -685,8 +540,8 @@ const Formulario = (() => {
                 ]),
         ];
 
-        secaoDadosPrincipais = new Secao("dadosPrincipais", "Dados principais", camposDadosPrincipais);
-        secaoDadosPrincipais.gerar();
+        this.#secaoDadosPrincipais = new Secao("dadosPrincipais", "Dados principais", camposDadosPrincipais, this.#campos);
+        this.#secaoDadosPrincipais.gerar();
 
         const camposContaBancaria = [
             new CampoLista("banco", "Banco", 4),
@@ -721,8 +576,8 @@ const Formulario = (() => {
             new CampoTexto("favTelefone", "Telefone ou celular", 2),
         ];
 
-        secaoContaBancaria = new Secao("contaBancaria", "Conta bancária", camposContaBancaria);
-        secaoContaBancaria.gerar();
+        this.#secaoContaBancaria = new Secao("contaBancaria", "Conta bancária", camposContaBancaria, this.#campos);
+        this.#secaoContaBancaria.gerar();
 
         const camposDetalhesDocumentos = [
             new CampoTexto("observacoes", "Observações", 12, null, null,
@@ -736,8 +591,8 @@ const Formulario = (() => {
             new CampoAnexo("comprovanteContaBancaria", "Comprovante de conta bancária", 4),
         ];
 
-        secaoDetalhesDocumentos = new Secao("detalhesDocumentos", "Detalhes e documentos", camposDetalhesDocumentos);
-        secaoDetalhesDocumentos.gerar();
+        this.#secaoDetalhesDocumentos = new Secao("detalhesDocumentos", "Detalhes e documentos", camposDetalhesDocumentos, this.#campos);
+        this.#secaoDetalhesDocumentos.gerar();
 
         const camposControle = [
             new CampoTexto(
@@ -750,30 +605,231 @@ const Formulario = (() => {
             ),
         ];
 
-        secaoControle = new Secao("controle", "Controle", camposControle);
-        secaoControle.gerar();
+        this.#secaoControle = new Secao("controle", "Controle", camposControle, this.#campos);
+        this.#secaoControle.gerar();
 
         // TODO: melhorar isso para definir os campos mestre de forma modular
         const camposFonteDocumento = ["razaoSocial", "nomeFantasia", "cep", "estado", "cidade", "logradouro",
             "numero", "bairro", "complemento", "emailContato", "telefone", "contatoAdicional"];
 
+        this.#salvarSecao(this.#secaoAprovacao);
+        this.#salvarSecao(this.#secaoContaBancaria);
+        this.#salvarSecao(this.#secaoDadosPrincipais);
+        this.#salvarSecao(this.#secaoDetalhesDocumentos);
+        this.#salvarSecao(this.#secaoControle);
+
+        const campoDocumento = this.#campos.obterCampo("documento");
+
         for (const id of camposFonteDocumento) {
-            campos[id].definirCampoMestre(campos["documento"]);
+            const campo = this.#campos.obterCampo(id);
+            campo.definirCampoMestre(campoDocumento);
         }
     }
 
-    return {
-        personalizacao,
-        campos,
-        camposObrigatorios,
-        camposBloqueados,
-        camposOcultos,
-        fontes,
-        carregarDados,
-        salvarDados,
-        obterValidacoes,
-        definirEstadoInicial,
-        configurarEventos,
-        gerar
-    };
-})();
+    #salvarSecao(secao) {
+        this.#secoes.set(secao.id, secao);
+    }
+
+    finalizar() {
+        for (const secao of this.#secoes.values()) {
+            if (!(secao instanceof ListaObjetos)) continue;
+
+            secao.exibirLinhas();
+        }
+    }
+
+    obterValidacoes() {
+        return [];
+    }
+
+    // salvarDados(): Promise<{}>
+    /*
+        Guarda os dados de todos os campos em um objeto para uso na função _saveData da API do workflow.
+     */
+    async salvarDados() {
+        let dados = {};
+
+        dados.observacoesAprovacao = this.#campos.obterCampo("observacoesAprovacao").val();
+        dados.documento = this.#campos.obterCampo("documento").cleanVal(); // Valor do campo sem máscara
+        dados.cadastroComRestricao = this.#campos.obterCampo("cadastroComRestricao").campo.prop("checked"); // Estado do checkbox (marcado ou não marcado)
+        dados.razaoSocial = this.#campos.obterCampo("razaoSocial").val();
+        dados.nomeFantasia = this.#campos.obterCampo("nomeFantasia").val();
+        dados.mercadoExterior = this.#campos.obterCampo("mercadoExterior").campo.prop("checked");
+        dados.fornecedorIndustria = this.#campos.obterCampo("fornecedorIndustria").campo.prop("checked");
+        dados.ramoAtividade = this.#campos.obterCampo("ramoAtividade").val();
+        dados.inscricaoEstadual = this.#campos.obterCampo("inscricaoEstadual").val();
+        dados.cep = this.#campos.obterCampo("cep").cleanVal();
+        dados.estado = this.#campos.obterCampo("estado").val();
+        dados.cidade = this.#campos.obterCampo("cidade").val();
+        dados.logradouro = this.#campos.obterCampo("logradouro").val();
+        dados.numero = this.#campos.obterCampo("numero").val();
+        dados.bairro = this.#campos.obterCampo("bairro").val();
+        dados.complemento = this.#campos.obterCampo("complemento").val();
+        dados.enderecoCorresp = this.#campos.obterCampo("enderecoCorresp").val();
+        dados.nomeContato = this.#campos.obterCampo("nomeContato").val();
+        dados.emailContato = this.#campos.obterCampo("emailContato").val();
+        dados.emailAdicional = this.#campos.obterCampo("emailAdicional").val();
+        dados.telefone = this.#campos.obterCampo("telefone").cleanVal();
+        dados.celular = this.#campos.obterCampo("celular").cleanVal();
+        dados.contatoAdicional = this.#campos.obterCampo("contatoAdicional").cleanVal();
+        dados.formaPagamento = this.#campos.obterCampo("formaPagamento").val();
+        dados.banco = this.#campos.obterCampo("banco").val();
+        dados.agenciaDigito = this.#campos.obterCampo("agenciaDigito").val();
+        dados.contaDigito = this.#campos.obterCampo("contaDigito").val();
+        dados.tipoConta = this.#campos.obterCampo("tipoConta").val();
+        dados.documentoConta = this.#campos.obterCampo("documentoConta").cleanVal();
+        dados.titularComRestricao = this.#campos.obterCampo("titularComRestricao").campo.prop("checked");
+        dados.titularConta = this.#campos.obterCampo("titularConta").val();
+        dados.favNomeFantasia = this.#campos.obterCampo("favNomeFantasia").val();
+        dados.favCep = this.#campos.obterCampo("favCep").val();
+        dados.favEstado = this.#campos.obterCampo("favEstado").val();
+        dados.favCidade = this.#campos.obterCampo("favCidade").val();
+        dados.favLogradouro = this.#campos.obterCampo("favLogradouro").val();
+        dados.favBairro = this.#campos.obterCampo("favBairro").val();
+        dados.favNumero = this.#campos.obterCampo("favNumero").val();
+        dados.favComplemento = this.#campos.obterCampo("favComplemento").val();
+        dados.favEmail = this.#campos.obterCampo("favEmail").val();
+        dados.favTelefone = this.#campos.obterCampo("favTelefone").cleanVal();
+        dados.observacoes = this.#campos.obterCampo("observacoes").val();
+        dados.documentosPessoaFisica = await Utilitario.salvarArquivosEmString(
+            this.#campos.obterCampo("documentosPessoaFisica").obterElementoHtml()
+        ); // Salvamento de anexo na forma de uma string
+        dados.comprovanteEndereco = await Utilitario.salvarArquivosEmString(
+            this.#campos.obterCampo("comprovanteEndereco").obterElementoHtml()
+        );
+        dados.comprovanteContaBancaria = await Utilitario.salvarArquivosEmString(
+            this.#campos.obterCampo("comprovanteContaBancaria").obterElementoHtml()
+        );
+        dados.nomeUsuario = this.#campos.obterCampo("nomeUsuario").val();
+        dados.retornoRegra = this.#campos.obterCampo("retornoRegra").val();
+
+        return dados;
+    }
+
+    carregarDadosFluxo(mapa) {
+
+    }
+
+    carregarDadosFormulario(mapa) {
+        this.#campos.obterCampo("observacoesAprovacao").val(mapa.get("observacoesAprovacao") || "");
+        this.#campos.obterCampo("documento").val(mapa.get("documento") || "");
+        const cnpjInaptoCadastro = (mapa.get("cadastroComRestricao") ?? "false") === "true";
+        this.#campos.obterCampo("cadastroComRestricao").campo.prop("checked", cnpjInaptoCadastro);
+        this.#campos.obterCampo("razaoSocial").val(mapa.get("razaoSocial") || "");
+        this.#campos.obterCampo("nomeFantasia").val(mapa.get("nomeFantasia") || "");
+        this.#campos.obterCampo("mercadoExterior").campo.prop("checked", (mapa.get("mercadoExterior") ?? "false") === "true");
+        this.#campos.obterCampo("fornecedorIndustria").campo.prop("checked", (mapa.get("fornecedorIndustria") ?? "false") === "true");
+        this.#campos.obterCampo("ramoAtividade").val(mapa.get("ramoAtividade") || "");
+        this.#campos.obterCampo("inscricaoEstadual").val(mapa.get("inscricaoEstadual") || "");
+        this.#campos.obterCampo("cep").val(mapa.get("cep") || "");
+        this.#campos.obterCampo("estado").val(mapa.get("estado") || "");
+        this.#campos.obterCampo("cidade").val(mapa.get("cidade") || "");
+        this.#campos.obterCampo("logradouro").val(mapa.get("logradouro") || "");
+        this.#campos.obterCampo("numero").val(mapa.get("numero") || "");
+        this.#campos.obterCampo("bairro").val(mapa.get("bairro") || "");
+        this.#campos.obterCampo("complemento").val(mapa.get("complemento") || "");
+        this.#campos.obterCampo("enderecoCorresp").val(mapa.get("enderecoCorresp") || "");
+        this.#campos.obterCampo("nomeContato").val(mapa.get("nomeContato") || "");
+        this.#campos.obterCampo("emailContato").val(mapa.get("emailContato") || "");
+        this.#campos.obterCampo("emailAdicional").val(mapa.get("emailAdicional") || "");
+        this.#campos.obterCampo("telefone").val(mapa.get("telefone") || "");
+        this.#campos.obterCampo("celular").val(mapa.get("celular") || "");
+        this.#campos.obterCampo("contatoAdicional").val(mapa.get("contatoAdicional") || "");
+        this.#campos.obterCampo("formaPagamento").val(mapa.get("formaPagamento") || "");
+        this.#campos.obterCampo("banco").val(mapa.get("banco") || "");
+        this.#campos.obterCampo("agenciaDigito").val(mapa.get("agenciaDigito") || "");
+        this.#campos.obterCampo("contaDigito").val(mapa.get("contaDigito") || "");
+        this.#campos.obterCampo("tipoConta").val(mapa.get("tipoConta") || "");
+        this.#campos.obterCampo("documentoConta").val(mapa.get("documentoConta") || "");
+        const cnpjInaptoTitular = (mapa.get("titularComRestricao") ?? "false") === "true";
+        this.#campos.obterCampo("titularComRestricao").campo.prop("checked", cnpjInaptoTitular);
+        this.#campos.obterCampo("titularConta").val(mapa.get("titularConta") || "");
+        this.#campos.obterCampo("favNomeFantasia").val(mapa.get("favNomeFantasia") || "");
+        this.#campos.obterCampo("favCep").val(mapa.get("favCep") || "");
+        this.#campos.obterCampo("favEstado").val(mapa.get("favEstado") || "");
+        this.#campos.obterCampo("favCidade").val(mapa.get("favCidade") || "");
+        this.#campos.obterCampo("favLogradouro").val(mapa.get("favLogradouro") || "");
+        this.#campos.obterCampo("favBairro").val(mapa.get("favBairro") || "");
+        this.#campos.obterCampo("favNumero").val(mapa.get("favNumero") || "");
+        this.#campos.obterCampo("favComplemento").val(mapa.get("favComplemento") || "");
+        this.#campos.obterCampo("favEmail").val(mapa.get("favEmail") || "");
+        this.#campos.obterCampo("favTelefone").val(mapa.get("favTelefone") || "");
+        this.#campos.obterCampo("observacoes").val(mapa.get("observacoes") || "");
+        this.#campos.obterCampo("nomeUsuario").val(mapa.get("nomeUsuario") || "");
+        this.#campos.obterCampo("retornoRegra").val(mapa.get("retornoRegra") || "");
+        this.#campos.obterCampo("documentosPessoaFisica").campo.prop(
+            "files",
+            Utilitario.carregarArquivosDeString(mapa.get("documentosPessoaFisica") || "")
+        );
+        this.#campos.obterCampo("comprovanteEndereco").campo.prop(
+            "files",
+            Utilitario.carregarArquivosDeString(mapa.get("comprovanteEndereco") || "")
+        );
+        this.#campos.obterCampo("comprovanteContaBancaria").campo.prop(
+            "files",
+            Utilitario.carregarArquivosDeString(mapa.get("comprovanteContaBancaria") || "")
+        );
+    }
+
+    definirEstadoInicial() {
+    }
+
+    configurarEventos() {
+
+    }
+
+    obterPersonalizacao() {
+        return Object.freeze(this.#personalizacao);
+    }
+
+    obterFontes() {
+        return Object.freeze(this.#fontes);
+    }
+
+    carregarArrayPorLista(listaDeObjetos) {
+        const array = [];
+
+        for (let i = 0; i < listaDeObjetos.tamanho; i++) {
+            const objeto = {};
+
+            if (this.#conversores.length === 0) {
+                for (const campo of listaDeObjetos.obterLinha(i)) {
+                    objeto[campo.id] = campo.valor();
+                }
+            }
+            else {
+                for (const conversor of this.#conversores) {
+                    if (!conversor.salvar) {
+                        continue;
+                    }
+
+                    objeto[conversor.propriedade] = this.#campos.obterPorLinha(conversor.idCampo, i).valor();
+                }
+            }
+
+            array.push(objeto);
+        }
+
+        return array;
+    }
+
+    carregarListaDeObjetos(array, listaDeObjetos) {
+        for (let i = 0; i < array.length; i++) {
+            if (i > 0) {
+                listaDeObjetos.adicionarLinha();
+            }
+
+            const indice = listaDeObjetos.obterIndiceUltimaLinha();
+
+            for (const conversor of this.#conversores) {
+                if (!conversor.carregar) {
+                    continue;
+                }
+
+                const campo = this.#campos.obterPorLinha(conversor.idCampo, indice);
+                const valor = conversor.obterValor(array[i]);
+                campo.valor(valor);
+            }
+        }
+    }
+}
