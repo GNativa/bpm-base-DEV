@@ -4,6 +4,8 @@
  */
 class Campo {
     #validacoes = [];
+    #quebra = null;
+    #quebrar = false;
 
     constructor(id, rotulo, largura, dica, tag, tipo, fonte, campoFonte) {
         this.id = id;                            // Atributo "id" do elemento HTML
@@ -115,6 +117,10 @@ class Campo {
                 elemento.attr("title", `${rotulo}: ${elemento.val()}`);
             }
         });
+    }
+
+    alterarRotulo(novo) {
+        this.label.text(novo);
     }
 
     adicionarValidacao(validacao) {
@@ -240,9 +246,11 @@ class Campo {
 
         if (this.visivel) {
             $(this.coluna).show();
+            this.#quebra?.show();
         }
         else {
             $(this.coluna).hide();
+            this.#quebra?.hide();
         }
 
         return this;
@@ -365,5 +373,18 @@ class Campo {
 
     notificar() {
         this.campo.trigger("change");
+    }
+
+    comQuebra() {
+        this.#quebrar = true;
+        return this;
+    }
+
+    temQuebra() {
+        return this.#quebrar;
+    }
+
+    salvarQuebra(quebra) {
+        this.#quebra = quebra;
     }
 }

@@ -264,7 +264,7 @@ class ListaObjetos extends Secao {
         }
 
         if (this.#permiteRemoverLinhas) {
-            const colunaBotaoRemover = $(`<div class="col-12 d-flex justify-content-end"></div>`);
+            const colunaBotaoRemover = $(`<div class="col-12 d-flex justify-content-end coluna-remover"></div>`);
             colunaBotaoRemover.append(botaoRemover);
             linhaItem.append(colunaBotaoRemover);
         }
@@ -288,6 +288,8 @@ class ListaObjetos extends Secao {
 
             linhaItem.append(campo.coluna);
             camposDaLinha.push(campo);
+
+            this.adicionarQuebra(linhaItem, campo);
         }
 
         this.divSecao.append(linhaItem);

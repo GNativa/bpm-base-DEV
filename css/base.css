@@ -167,7 +167,7 @@ select[required], input[type="file"][required] {
 }
 
 /* Esconder seções vazias */
-.secao:not(:has(> .linha-secao > div:not([style*="display: none"]))) {
+.secao:not(:has(> .linha-secao > div:not([style*="display: none"]):not(.coluna-remover))) {
     display: none;
 }
 

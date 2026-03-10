@@ -13,6 +13,7 @@ class Secao {
         this.divSecao = $("<div></div>");
         this.campos = campos ?? [];
         this.colecao = colecao;
+        this.tituloSecao = null;
     }
 
     configurarTitulo(elementoSecao = $("")) {
@@ -20,6 +21,8 @@ class Secao {
         const colunaTitulo = $(`<div class="col coluna-titulo"></div>`);
         const tituloSecao = $(`<div class="titulo-g"></div>`);
         tituloSecao.text(this.titulo);
+
+        this.tituloSecao = tituloSecao;
 
         const hr = $(`<hr class="hr-titulo border-0">`);
         linhaTitulo.append(colunaTitulo);
@@ -38,6 +41,18 @@ class Secao {
         Utilitario.configurarTooltips();
     }
 
+    obterQuebra(campo) {
+        return $(`<div id="quebra-${campo.id}" class="w-100"></div>`);
+    }
+
+    adicionarQuebra(linha, campo) {
+        if (campo.temQuebra()) {
+            const quebra = this.obterQuebra(campo);
+            linha.append(quebra);
+            campo.salvarQuebra(quebra);
+        }
+    }
+
     criarLinha() {
         const linhaCampos = $(`<div class="row g-3 pb-3 linha-secao"></div>`);
 
@@ -47,8 +62,10 @@ class Secao {
             }
 
             linhaCampos.append(campo.coluna);
-            this.divSecao.append(linhaCampos);
+            this.adicionarQuebra(linhaCampos, campo);
         }
+
+        this.divSecao.append(linhaCampos);
     }
 
     salvarCampos() {
@@ -103,5 +120,16 @@ class Secao {
 
     adicionarCampo(campo = new Campo()) {
         this.campos.push(campo);
+    }
+
+    alterarTitulo(titulo) {
+        if (!this.possuiTitulo) {
+            return null;
+        }
+
+        this.titulo = titulo;
+        this.tituloSecao.text(titulo);
+
+        return this.titulo;
     }
 }
