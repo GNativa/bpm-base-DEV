@@ -2,7 +2,6 @@
     > Formulário
         - Mantém o estado do formulário, realizando carregamento e salvamento de dados, validações, etc.
  */
-// TODO: atualizar classe para o novo formato
 class Formulario {
     #fontes = {};
     #secoes = new Map();
@@ -58,6 +57,7 @@ class Formulario {
                 const valor = this.#campos.obterCampo("documento").val();
                 return valor.length === 14;
             },
+            null,
             null,
             "https://publica.cnpj.ws/cnpj/",
             new ParametrosConsulta({

@@ -147,7 +147,16 @@ class CampoTexto extends CampoEntrada {
                 }
 
                 // Filtrar dados com base no que foi digitado no campo
-                const dadosFiltrados = Utilitario.filtrarDados(dados, valor, dados[0], this.campoFonte);
+                // (somente se a fonte não for tratada pelo Senior X mesmo)
+
+                let dadosFiltrados;
+
+                if (this.fonte.tipo === Constantes.fontes.tipos.tabela) {
+                    dadosFiltrados = dados;
+                }
+                else {
+                    dadosFiltrados = Utilitario.filtrarDados(dados, valor, dados[0], this.campoFonte);
+                }
 
                 if (dadosFiltrados.length === 1) {
                     this.fonte.atualizarRegistro(dadosFiltrados[0]);

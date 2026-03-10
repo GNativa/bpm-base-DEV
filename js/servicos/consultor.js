@@ -12,9 +12,11 @@ class Consultor {
             let urlConsulta = "https://platform.senior.com.br/t/senior.com.br/bridge/1.0/rest/platform/ecm_form/actions/getResultSet";
             let corpo = {
                 dataSource: `${fonte.nome}`,
+                dataSourceField: `${fonte.campoChave}`,
                 token: `${token}`,
                 top: 50000,
-                filters: fonte.filtros ?? [],
+                filters: fonte.obterFiltros() ?? [],
+                searchingValue: fonte.obterValorPesquisa()
                 // filters: [
                     // {
                     //   "logicalOperator": "AND",

@@ -1,5 +1,6 @@
 class Fonte {
-    constructor(id, nome, campoChave, campoValor, tipo, descricoes, realizarConsulta, filtros, urlBase, parametros,
+    constructor(id, nome, campoChave, campoValor, tipo, descricoes, realizarConsulta,
+                obterFiltros, obterValorPesquisa, urlBase, parametros,
                 tratarRetorno, formatarDados) {
         this.id = id;                         // Código de identificação da fonte no formulário
         this.nome = nome;                     // Nome de exibição e consulta nas APIs da plataforma
@@ -12,7 +13,7 @@ class Fonte {
             function() {
                 return true;
             };
-        this.filtros = filtros ?? [];         // Lista de filtros a serem aplicados na consulta das APIs da plataforma
+        this.obterFiltros = obterFiltros ?? (() => []);         // Lista de filtros a serem aplicados na consulta das APIs da plataforma
         this.urlBase = urlBase ?? "";         // URL base para consulta por API
         this.parametros = parametros ??       // Parâmetros para consulta por API
             new ParametrosConsulta();
@@ -26,6 +27,7 @@ class Fonte {
 
         this.registroAtual = null;
         this.camposInscritos = new Set();
+        this.obterValorPesquisa = obterValorPesquisa ?? (() => null);
     }
 
     inscreverCampo(campo) {

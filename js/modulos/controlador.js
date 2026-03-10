@@ -9,7 +9,7 @@ class Controlador {
     #colecao;
     formulario;
     #inicializado = false; // Indica se o formulário foi inicializado
-    #accessToken = null; // Access token da plataforma
+    static #accessToken = null; // Access token da plataforma
     workflowCockpit;
 
     constructor(validador, colecao, formulario) {
@@ -54,7 +54,6 @@ class Controlador {
 
         info["getUserData"]()
             .then(function (user) {
-                console.log(user);
                 /*
                 {
                     "id": "",
@@ -82,8 +81,6 @@ class Controlador {
             })
              */
             .then((data) => {
-                console.log(data);
-
                 if (!info["isRequestNew"]() && Array.isArray(data)) {
                     const mapa = new Map();
 
@@ -91,7 +88,6 @@ class Controlador {
                         mapa.set(data[i].key, data[i].value || "");
                     }
 
-                    console.log("Carregando dados do formulário: ", mapa);
                     this.formulario.carregarDadosFormulario(mapa);
 
                     // Disparar eventos dos campos para ativar validações
@@ -116,7 +112,6 @@ class Controlador {
         this.#validarFormulario();
 
         let dados = await this.formulario.salvarDados();
-        console.log(dados);
 
         return {
             formData: dados,
@@ -184,7 +179,6 @@ class Controlador {
             const fonte = Formulario.fontes[nomeFonte];
 
             fonte.definirDados(await Consultor.carregarFonte(fonte, token));
-            console.log(fonte.dados);
 
             /* TODO: Trocar isso para variar conforme o tipo do campo ou algo assim
             for (const campo of fonte.camposCorrespondentes) {
@@ -320,5 +314,9 @@ class Controlador {
         }
 
         this.#validador.configurarValidacoes(false);
+    }
+
+    static obterToken() {
+        return this.#accessToken;
     }
 }
