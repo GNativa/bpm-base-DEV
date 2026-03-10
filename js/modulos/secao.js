@@ -41,12 +41,10 @@ class Secao {
     criarLinha() {
         const linhaCampos = $(`<div class="row g-3 pb-3 linha-secao"></div>`);
 
-        for (const factory of this.campos) {
-            if (document.getElementById(factory.idCampo) !== null) {
-                this.lancarErroDeCampoDuplicado(factory.idCampo);
+        for (const campo of this.campos) {
+            if (document.getElementById(campo.id) !== null) {
+                this.lancarErroDeCampoDuplicado(campo.id);
             }
-
-            const campo = factory.construir(factory.idCampo);
 
             linhaCampos.append(campo.coluna);
             this.divSecao.append(linhaCampos);
