@@ -1,10 +1,38 @@
 class Validacao {
     static #proximoId = 1;
+    /** @returns Array<Campo> */
+    camposMonitorados;
+    /** @returns Array<Campo> */
+    camposConsistidos;
+    /** @returns Array<Campo> */
+    camposObrigatorios;
+    /** @returns Array<Campo> */
+    camposOcultos;
+    /** @returns Array<Campo> */
+    camposDesabilitados;
+    /** @returns Array<Campo> */
+    camposExibidos;
+    /** @returns Array<Campo> */
+    camposHabilitados;
+    /** @type boolean */
+    afetaVariasLinhas;
 
-    constructor(ativa = (campo) => false, feedback, camposMonitorados,
-                camposConsistidos, camposObrigatorios, camposOcultos,
-                camposDesabilitados, camposExibidos, camposHabilitados,
-                afetaVariasLinhas = false) {
+    /**
+     * @param ativa {(function(ContextoValidacao): boolean)|undefined}
+     * @param feedback {string}
+     * @param camposMonitorados {function: Array}
+     * @param camposConsistidos {function: Array}
+     * @param camposObrigatorios {function: Array}
+     * @param camposOcultos {function: Array}
+     * @param camposDesabilitados {function: Array}
+     * @param camposExibidos {function: Array}
+     * @param camposHabilitados {function: Array}
+     * @param afetaVariasLinhas {boolean}
+     */
+    constructor(ativa,
+        feedback, camposMonitorados, camposConsistidos, camposObrigatorios, camposOcultos,
+        camposDesabilitados, camposExibidos, camposHabilitados, afetaVariasLinhas = false
+    ) {
         this.id = Validacao.#proximoId;
         Validacao.#proximoId++;
         this.ativa = ativa;
@@ -21,15 +49,19 @@ class Validacao {
 }
 
 class Validador {
+    /** @type Array<Validacao> */
     #validacoes;
-    #camposJaConfigurados;
-    #camposObrigatorios;
-    #camposBloqueados;
-    #camposOcultos;
+    /** @type Array<Campo> */
+    #camposJaConfigurados = [];
+    /** @type ?Array<Campo> */
+    #camposObrigatorios = null;
+    /** @type ?Array<Campo> */
+    #camposBloqueados = null;
+    /** @type ?Array<Campo> */
+    #camposOcultos = null;
 
     constructor(validacoes = []) {
         this.#validacoes = validacoes;
-        this.#camposJaConfigurados = [];
         this.#camposObrigatorios = null;
         this.#camposBloqueados = null;
         this.#camposOcultos = null;
@@ -66,34 +98,36 @@ class Validador {
 
     // Filtrar campos que pertencem à mesma linha de uma lista de objetos
     // que a do campo base; retornar a lista como está caso o campo não pertença a uma lista de objetos
-    filtrarCamposDaMesmaLinha(campoBase = new Campo(), campos = [new Campo()]) {
+    filtrarCamposDaMesmaLinha(campoBase = new Campo, campos = [new Campo]) {
         if (campoBase.listaDeObjetos == null) {
             return campos;
         }
 
         return campos.filter(function(elemento) {
-            return elemento.linhaLista !== null
-                && elemento.listaDeObjetos === campoBase.listaDeObjetos
-                && elemento.linhaLista === campoBase.linhaLista;
+            return elemento.linhaLista === null ||
+                   (elemento.listaDeObjetos === campoBase.listaDeObjetos
+                && elemento.linhaLista === campoBase.linhaLista);
         });
     }
 
     // Executar uma função de configuração para uma determinada validação com base
     // em um campo monitorado e em campos que devem se tornar obrigatórios, serem exibidos, ocultos, etc.,
     // conforme a validação
-    #configurarValidacao(
-        validacao ,
-        campoMonitorado,
-        obterCampos,
-        configurar
-    ) {
+    /**
+     * @param validacao {Validacao}
+     * @param campoMonitorado {Campo}
+     * @param obterCampos {function: Array<Campo>}
+     * @param ativar {function(Campo, boolean): void}
+     */
+    #vincularEvento(validacao, campoMonitorado, obterCampos, ativar) {
         const campos = obterCampos().flat();
 
         if (campos.length === 0) {
             return;
         }
 
-        if (!validacao.afetaVariasLinhas && this.filtrarCamposDaMesmaLinha(campoMonitorado, campos).length === 0) {
+        if (!validacao.afetaVariasLinhas
+         && this.filtrarCamposDaMesmaLinha(campoMonitorado, campos).length === 0) {
             return;
         }
 
@@ -107,38 +141,78 @@ class Validador {
                 listaCampos = this.filtrarCamposDaMesmaLinha(campoMonitorado, obterCampos());
             }
 
+            const ativa = this.#ativarValidacao(validacao, campoMonitorado);
+
             for (const campo of listaCampos) {
-                configurar(campo);
-                // campo.sobrescreverEdicao(validacao.sobrescreverEdicao);
-                // campo.sobrescreverObrigatoriedade(validacao.sobrescreverObrigatoriedade);
+                ativar(campo, ativa);
             }
         });
     }
 
-    removerCampoValidado(campo = new Campo) {
+    /** @param campo {Campo} */
+    removerCampoValidado(campo) {
         this.#camposJaConfigurados = this.#camposJaConfigurados.filter((campoConfigurado) => {
             return campoConfigurado.id !== campo.id;
         });
     }
 
-    removerCamposValidados(campos = [new Campo()]) {
+    /** @param campos {Array<Campo>} */
+    removerCamposValidados(campos) {
         for (const campo of campos) {
             this.removerCampoValidado(campo);
         }
     }
 
-    configurarParaUmCampo(validacao = new Validacao(), campo = new Campo()) {
-        this.#configurarValidacao(
+    /**
+     * @param validacao {Validacao}
+     * @param campoMonitorado {Campo}
+     * @returns {boolean}
+     */
+    #ativarValidacao(validacao, campoMonitorado) {
+        const contexto = new ContextoValidacao(validacao, campoMonitorado);
+        return validacao.ativa(contexto);
+    }
+
+    /*
+    #ativarValidacao(
+        validacao = new Validacao,
+        campoMonitorado = new Campo,
+    ) {
+        const agrupador = {};
+
+        for (const monitorado of validacao.camposMonitorados().flat()) {
+            const id = monitorado.idAgrupado;
+
+            if (validacao.afetaVariasLinhas) {
+                if (!agrupador.hasOwnProperty(id)) {
+                    agrupador[id] = [];
+                }
+
+                agrupador[id].push(monitorado);
+            }
+            else {
+                agrupador[monitorado.idAgrupado] = monitorado;
+            }
+        }
+
+        return validacao.ativa(agrupador);
+    }
+     */
+
+    /**
+     * @param validacao {Validacao}
+     * @param campo {Campo}
+     */
+    configurarParaUmCampo(validacao, campo) {
+        this.#vincularEvento(
             validacao,
             campo,
             validacao.camposConsistidos,
-            (consistido) => {
+            (consistido, ativa) => {
                 if (consistido["consistenciaAtiva"] !== null
                     && consistido["consistenciaAtiva"]["id"] !== validacao["id"]) {
                     return;
                 }
-
-                const ativa = validacao.ativa(campo);
 
                 if (ativa && consistido["consistenciaAtiva"] === null) {
                     consistido.definirConsistenciaAtiva(validacao);
@@ -155,58 +229,58 @@ class Validador {
             }
         );
 
-        this.#configurarValidacao(
+        this.#vincularEvento(
             validacao,
             campo,
             validacao.camposObrigatorios,
-            (obrigatorio) => {
-                obrigatorio.definirObrigatoriedade(validacao.ativa(campo));
+            (obrigatorio, ativa) => {
+                obrigatorio.definirObrigatoriedade(ativa);
             }
         );
 
-        this.#configurarValidacao(
+        this.#vincularEvento(
             validacao,
             campo,
             validacao.camposOcultos,
-            (oculto) => {
-                oculto.definirVisibilidade(!validacao.ativa(campo));
+            (oculto, ativa) => {
+                oculto.definirVisibilidade(ativa);
             }
         );
 
-        this.#configurarValidacao(
+        this.#vincularEvento(
             validacao,
             campo,
             validacao.camposDesabilitados,
-            (desabilitado) => {
-                desabilitado.definirEdicao(!validacao.ativa(campo));
+            (desabilitado, ativa) => {
+                desabilitado.definirEdicao(ativa);
             }
         );
 
-        this.#configurarValidacao(
+        this.#vincularEvento(
             validacao,
             campo,
             validacao.camposExibidos,
-            (exibido) => {
-                exibido.definirVisibilidade(validacao.ativa(campo));
+            (exibido, ativa) => {
+                exibido.definirVisibilidade(ativa);
             }
         );
 
-        this.#configurarValidacao(
+        this.#vincularEvento(
             validacao,
             campo,
             validacao.camposHabilitados,
-            (habilitado) => {
-                habilitado.definirEdicao(validacao.ativa(campo));
+            (habilitado, ativa) => {
+                habilitado.definirEdicao(ativa);
             }
         );
 
         campo.notificar();
     }
 
-    configurarValidacoes(verificarConfigurados) {
+    /** @param verificarConfigurados {boolean} */
+    configurarValidacoes(verificarConfigurados = false) {
         for (const validacao of this.#validacoes) {
-            let camposMonitorados = validacao.camposMonitorados();
-            camposMonitorados = camposMonitorados.flat();
+            let camposMonitorados = validacao.camposMonitorados().flat();
 
             if (verificarConfigurados) {
                 camposMonitorados = camposMonitorados.filter((campo) => {

@@ -98,7 +98,9 @@ const Utilitario = (() => {
         });
     }
 
-    const criarGetterDeArray = function(funcao) {
+    /** @returns {function: Array} */
+    const criarGetterDeArray = function(funcao)
+    {
         return () => Array.from(funcao?.() ?? []);
     }
 
