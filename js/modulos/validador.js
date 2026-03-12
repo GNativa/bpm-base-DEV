@@ -19,15 +19,15 @@ class Validacao {
 
     /**
      * @param ativa {(function(ContextoValidacao): boolean)|undefined}
-     * @param feedback {string}
-     * @param camposMonitorados {function: Array}
-     * @param camposConsistidos {function: Array}
-     * @param camposObrigatorios {function: Array}
-     * @param camposOcultos {function: Array}
-     * @param camposDesabilitados {function: Array}
-     * @param camposExibidos {function: Array}
-     * @param camposHabilitados {function: Array}
-     * @param afetaVariasLinhas {boolean}
+     * @param feedback {?string}
+     * @param camposMonitorados {(?function: Array)|undefined}
+     * @param camposConsistidos {(?function: Array)|undefined}
+     * @param camposObrigatorios {(?function: Array)|undefined}
+     * @param camposOcultos {(?function: Array)|undefined}
+     * @param camposDesabilitados {(?function: Array)|undefined}
+     * @param camposExibidos {(?function: Array)|undefined}
+     * @param camposHabilitados {(?function: Array)|undefined}
+     * @param afetaVariasLinhas {?boolean|undefined}
      */
     constructor(ativa,
         feedback, camposMonitorados, camposConsistidos, camposObrigatorios, camposOcultos,
@@ -96,9 +96,15 @@ class Validador {
         return $(".invalido:visible").length === 0 && $(".nao-preenchido:visible").length === 0;
     }
 
-    // Filtrar campos que pertencem à mesma linha de uma lista de objetos
-    // que a do campo base; retornar a lista como está caso o campo não pertença a uma lista de objetos
-    filtrarCamposDaMesmaLinha(campoBase = new Campo, campos = [new Campo]) {
+    /**
+     * Filtrar campos que pertencem à mesma linha de uma lista de objetos
+     * que a do campo base; retornar a lista como está caso o campo não pertença a uma lista de objetos
+     *
+     * @param campoBase {Campo}
+     * @param campos {Campo[]}
+     * @returns {Campo[]}
+     */
+    filtrarCamposDaMesmaLinha(campoBase, campos) {
         if (campoBase.listaDeObjetos == null) {
             return campos;
         }
@@ -110,13 +116,14 @@ class Validador {
         });
     }
 
-    // Executar uma função de configuração para uma determinada validação com base
-    // em um campo monitorado e em campos que devem se tornar obrigatórios, serem exibidos, ocultos, etc.,
-    // conforme a validação
     /**
+     * Executar uma função de configuração para uma determinada validação com base
+     * em um campo monitorado e em campos que devem se tornar obrigatórios, serem exibidos, ocultos, etc.,
+     * conforme a validação
+     *
      * @param validacao {Validacao}
      * @param campoMonitorado {Campo}
-     * @param obterCampos {function: Array<Campo>}
+     * @param obterCampos {function: Campo[]}
      * @param ativar {function(Campo, boolean): void}
      */
     #vincularEvento(validacao, campoMonitorado, obterCampos, ativar) {
@@ -156,7 +163,7 @@ class Validador {
         });
     }
 
-    /** @param campos {Array<Campo>} */
+    /** @param campos {Campo[]} */
     removerCamposValidados(campos) {
         for (const campo of campos) {
             this.removerCampoValidado(campo);
