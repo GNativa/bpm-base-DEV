@@ -18,16 +18,16 @@ class Validacao {
     afetaVariasLinhas;
 
     /**
-     * @param ativa {(function(ContextoValidacao): boolean)|undefined}
+     * @param ativa {(function(ContextoValidacao): boolean)|(function(): boolean)}
      * @param feedback {?string}
-     * @param camposMonitorados {(?function: Array)|undefined}
-     * @param camposConsistidos {(?function: Array)|undefined}
-     * @param camposObrigatorios {(?function: Array)|undefined}
-     * @param camposOcultos {(?function: Array)|undefined}
-     * @param camposDesabilitados {(?function: Array)|undefined}
-     * @param camposExibidos {(?function: Array)|undefined}
-     * @param camposHabilitados {(?function: Array)|undefined}
-     * @param afetaVariasLinhas {?boolean|undefined}
+     * @param [camposMonitorados] {(?function: Array)}
+     * @param [camposConsistidos] {(?function: Array)}
+     * @param [camposObrigatorios] {(?function: Array)}
+     * @param [camposOcultos] {(?function: Array)}
+     * @param [camposDesabilitados] {(?function: Array)}
+     * @param [camposExibidos] {(?function: Array)}
+     * @param [camposHabilitados] {(?function: Array)}
+     * @param [afetaVariasLinhas] {?boolean}
      */
     constructor(ativa,
         feedback, camposMonitorados, camposConsistidos, camposObrigatorios, camposOcultos,
